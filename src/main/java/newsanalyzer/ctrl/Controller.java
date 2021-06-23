@@ -1,5 +1,6 @@
 package newsanalyzer.ctrl;
 
+import newsanalyzer.downloader.Downloader;
 import newsapi.NewsApi;
 import newsapi.NewsApiBuilder;
 import newsapi.NewsApiException;
@@ -16,8 +17,10 @@ public class Controller {
 
 	public static final String APIKEY = "962e4c2a95984cbd9de1734c95868998";
 
+	private List<String> URLList;
+
 	public void process(String query, Endpoint endpoint, Language language, Country country, Category category,
-						SortBy sortBy) throws Exception {
+						SortBy sortBy, int pageSize) throws Exception {
 		System.out.println("Start process");
 
 		NewsApi newApi = new NewsApiBuilder()
@@ -28,6 +31,7 @@ public class Controller {
 				.setSourceCountry(country)
 				.setSourceCategory(category)
 				.setSortBy(sortBy)
+				.setPageSize(Integer.toString(pageSize))
 				.createNewsApi();
 
 		NewsReponse newsReponse = (NewsReponse) getData(newApi);
@@ -42,7 +46,7 @@ public class Controller {
 				System.out.println(System.lineSeparator() + "Analyse der Ergebnisse:");
 				System.out.println("Anzahl der Artikel: " + getArticleCount(articles));
 				System.out.println("Meisten Artikel von: " + getMostFrequentProvider(articles));
-				System.out.println("Autor mit dem kürzesten Namen: " + getAutorWithShortestName(articles));
+				System.out.println("Autor mit dem kürzesten Namen: " + getAuthorWithShortestName(articles));
 				System.out.println("Sortiert: ");
 				List<Article> sortedByTitle = sortByTitleLength(articles);
 				sortedByTitle.stream().forEach(e -> System.out.println(e.getTitle()));
@@ -50,12 +54,14 @@ public class Controller {
 				throw new NewsApiException("Statistic error");
 			}
 
-			System.out.println(System.lineSeparator() + "Do you want to download the articles?");
-			System.out.println("[Y]es or [N]o");
-			Scanner scanner = new Scanner(System.in);
-			String choice = scanner.nextLine();
+			URLList = getURLList(articles);
 
-			if (choice.toLowerCase(Locale.ROOT).equals("y")) downloadArticles(newApi, articles);
+//			System.out.println(System.lineSeparator() + "Do you want to download the articles?");
+//			System.out.println("[Y]es or [N]o");
+//			Scanner scanner = new Scanner(System.in);
+//			String choice = scanner.nextLine();
+//
+//			if (choice.toLowerCase(Locale.ROOT).equals("y")) download(newApi, articles);
 		} else {
 			throw new NewsApiException("News response is null");
 		}
@@ -67,6 +73,19 @@ public class Controller {
 		//TODO implement methods for analysis
 
 		System.out.println("End process");
+	}
+
+	public void download(Downloader downloader) throws Exception {
+		if (URLList == null) throw new NewsApiException("Keine Artikel zum herunterladen gefunden");
+		int count = downloader.process(URLList);
+		System.out.print(count + " Artikel heruntergeladen");
+	}
+
+	private List<String> getURLList(List<Article> articles) {
+		return articles
+				.stream()
+				.map(article -> article.getUrl())
+				.collect(Collectors.toList());
 	}
 
 	private long getArticleCount(List<Article> articles) {
@@ -83,7 +102,7 @@ public class Controller {
 				.getKey();
 	}
 
-	private String getAutorWithShortestName(List<Article> articles) throws NullPointerException {
+	private String getAuthorWithShortestName(List<Article> articles) throws NullPointerException {
 		Optional<Article> shortestName = articles.stream()
 				.filter(article -> article.getAuthor() != null)
 				.min(Comparator.comparingInt(article -> article.getAuthor().length()));
